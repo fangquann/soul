@@ -29,10 +29,9 @@ import org.dromara.soul.common.enums.PluginEnum;
 import org.dromara.soul.common.enums.PluginTypeEnum;
 import org.dromara.soul.common.enums.ResultEnum;
 import org.dromara.soul.common.enums.RpcTypeEnum;
-import org.dromara.soul.common.utils.GSONUtils;
+import org.dromara.soul.common.utils.GsonUtils;
 import org.dromara.soul.common.utils.LogUtils;
-import org.dromara.soul.web.balance.LoadBalance;
-import org.dromara.soul.web.balance.factory.LoadBalanceFactory;
+import org.dromara.soul.web.balance.utils.LoadBalanceUtils;
 import org.dromara.soul.web.cache.UpstreamCacheManager;
 import org.dromara.soul.web.cache.ZookeeperCacheManager;
 import org.dromara.soul.web.plugin.AbstractSoulPlugin;
@@ -44,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoSink;
 import rx.Subscription;
 
 import java.util.List;
@@ -78,7 +76,7 @@ public class DividePlugin extends AbstractSoulPlugin {
     protected Mono<Void> doExecute(final ServerWebExchange exchange, final SoulPluginChain chain, final SelectorZkDTO selector, final RuleZkDTO rule) {
         final RequestDTO requestDTO = exchange.getAttribute(Constants.REQUESTDTO);
 
-        final DivideRuleHandle ruleHandle = GSONUtils.getInstance().fromJson(rule.getHandle(), DivideRuleHandle.class);
+        final DivideRuleHandle ruleHandle = GsonUtils.getInstance().fromJson(rule.getHandle(), DivideRuleHandle.class);
 
         if (StringUtils.isBlank(ruleHandle.getGroupKey())) {
             ruleHandle.setGroupKey(Objects.requireNonNull(requestDTO).getModule());
@@ -95,16 +93,10 @@ public class DividePlugin extends AbstractSoulPlugin {
             return chain.execute(exchange);
         }
 
-        DivideUpstream divideUpstream = null;
-        if (upstreamList.size() == 1) {
-            divideUpstream = upstreamList.get(0);
-        } else {
-            if (StringUtils.isNoneBlank(ruleHandle.getLoadBalance())) {
-                final LoadBalance loadBalance = LoadBalanceFactory.of(ruleHandle.getLoadBalance());
-                final String ip = Objects.requireNonNull(exchange.getRequest().getRemoteAddress()).getAddress().getHostAddress();
-                divideUpstream = loadBalance.select(upstreamList, ip);
-            }
-        }
+        final String ip = Objects.requireNonNull(exchange.getRequest().getRemoteAddress()).getAddress().getHostAddress();
+
+        DivideUpstream divideUpstream =
+                LoadBalanceUtils.selector(upstreamList, ruleHandle.getLoadBalance(), ip);
 
         if (Objects.isNull(divideUpstream)) {
             LogUtils.error(LOGGER, () -> "LoadBalance has error！");
@@ -113,7 +105,7 @@ public class DividePlugin extends AbstractSoulPlugin {
 
         HttpCommand command = new HttpCommand(HystrixBuilder.build(ruleHandle), exchange, chain,
                 requestDTO, buildRealURL(divideUpstream), ruleHandle.getTimeout());
-        return Mono.create((MonoSink<Object> s) -> {
+        return Mono.create(s -> {
             Subscription sub = command.toObservable().subscribe(s::success,
                     s::error, s::success);
             s.onCancel(sub::unsubscribe);

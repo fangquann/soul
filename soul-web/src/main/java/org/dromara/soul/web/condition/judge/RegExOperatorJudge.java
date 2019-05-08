@@ -16,18 +16,21 @@
  *
  */
 
-package org.dromara.soul.configuration.zookeeper;
+package org.dromara.soul.web.condition.judge;
+
+import org.dromara.soul.common.dto.zk.ConditionZkDTO;
+
+import java.util.regex.Pattern;
 
 /**
- * acquire serializer name .
+ * The type Reg ex operator judge.
+ *
  * @author xiaoyu(Myth)
  */
-public interface SerializerName {
+public class RegExOperatorJudge implements OperatorJudge {
 
-    /**
-     * this is acquire  serializer name .
-     *
-     * @return serializer name
-     */
-    String named();
+    @Override
+    public Boolean judge(final ConditionZkDTO conditionZkDTO, final String realData) {
+        return Pattern.matches(conditionZkDTO.getParamValue(), realData);
+    }
 }

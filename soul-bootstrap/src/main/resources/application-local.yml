@@ -1,5 +1,5 @@
 server:
-  port: 8089
+  port: 9001
   address: 0.0.0.0
 
 spring:
@@ -29,7 +29,6 @@ spring:
         url : localhost:2181
         sessionTimeout: 5000
         connectionTimeout : 2000
-        serializer : KryoSerializer
 soul:
     bufferSize: 4096
     timeVerify:

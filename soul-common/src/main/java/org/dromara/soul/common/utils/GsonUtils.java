@@ -28,8 +28,11 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.reflect.TypeToken;
 import org.apache.commons.lang3.StringUtils;
+import org.dromara.soul.common.constant.Constants;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,12 +44,15 @@ import java.util.Set;
  *
  * @author xiaoyu(Myth)
  */
-@SuppressWarnings("all")
-public class GSONUtils {
+public class GsonUtils {
 
-    private static final GSONUtils INSTANCE = new GSONUtils();
+    private static final GsonUtils INSTANCE = new GsonUtils();
 
     private static final Gson GSON = new Gson();
+
+    private static final String DOT = ".";
+
+    private static final String E = "e";
 
     private class MapDeserializer<T, U> implements JsonDeserializer<Map<T, U>> {
 
@@ -58,14 +64,14 @@ public class GSONUtils {
 
             JsonObject jsonObject = json.getAsJsonObject();
             Set<Map.Entry<String, JsonElement>> jsonEntrySet = jsonObject.entrySet();
-            Map<T, U> deserializedMap = new LinkedHashMap<>();
+            Map<T, U> resultMap = new LinkedHashMap<>();
 
             for (Map.Entry<String, JsonElement> entry : jsonEntrySet) {
                 U value = context.deserialize(entry.getValue(), this.getType(entry.getValue()));
-                deserializedMap.put((T) entry.getKey(), value);
+                resultMap.put((T) entry.getKey(), value);
             }
 
-            return deserializedMap;
+            return resultMap;
         }
 
         /**
@@ -81,7 +87,7 @@ public class GSONUtils {
                     return String.class;
                 } else if (primitive.isNumber()) {
                     String numStr = primitive.getAsString();
-                    if (numStr.contains(".") || numStr.contains("e")
+                    if (numStr.contains(DOT) || numStr.contains(E)
                             || numStr.contains("E")) {
                         return Double.class;
                     }
@@ -100,7 +106,7 @@ public class GSONUtils {
      *
      * @return the instance
      */
-    public static GSONUtils getInstance() {
+    public static GsonUtils getInstance() {
         return INSTANCE;
     }
 
@@ -153,7 +159,16 @@ public class GSONUtils {
         }
         final Map<String, String> map = toStringMap(json);
         StringBuilder stringBuilder = new StringBuilder();
-        map.forEach((k, v) -> stringBuilder.append(k).append("=").append(v).append("&"));
+        map.forEach((k, v) -> {
+            try {
+                stringBuilder.append(k)
+                        .append("=")
+                        .append(URLDecoder.decode(v,Constants.DECODE))
+                        .append("&");
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+        });
         final String r = stringBuilder.toString();
         return r.substring(0, r.lastIndexOf("&"));
 
@@ -165,7 +180,7 @@ public class GSONUtils {
      * @param json json
      * @return hashMap map
      */
-    public Map<String, String> toStringMap(final String json) {
+    private Map<String, String> toStringMap(final String json) {
         return GSON.fromJson(json, new TypeToken<Map<String, String>>() {
         }.getType());
     }

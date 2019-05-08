@@ -21,8 +21,10 @@ package org.dromara.soul.web.config;
 import org.dromara.soul.web.cache.UpstreamCacheManager;
 import org.dromara.soul.web.cache.ZookeeperCacheManager;
 import org.dromara.soul.web.disruptor.publisher.SoulEventPublisher;
+import org.dromara.soul.web.filter.BodyWebFilter;
 import org.dromara.soul.web.filter.ParamWebFilter;
 import org.dromara.soul.web.filter.TimeWebFilter;
+import org.dromara.soul.web.filter.WebSocketWebFilter;
 import org.dromara.soul.web.handler.SoulHandlerMapping;
 import org.dromara.soul.web.handler.SoulWebHandler;
 import org.dromara.soul.web.plugin.SoulPlugin;
@@ -31,16 +33,25 @@ import org.dromara.soul.web.plugin.after.ResponsePlugin;
 import org.dromara.soul.web.plugin.before.GlobalPlugin;
 import org.dromara.soul.web.plugin.before.SignPlugin;
 import org.dromara.soul.web.plugin.before.WafPlugin;
+import org.dromara.soul.web.plugin.dubbo.GenericParamService;
+import org.dromara.soul.web.plugin.dubbo.GenericParamServiceImpl;
 import org.dromara.soul.web.plugin.function.DividePlugin;
 import org.dromara.soul.web.plugin.function.RateLimiterPlugin;
 import org.dromara.soul.web.plugin.function.RewritePlugin;
+import org.dromara.soul.web.plugin.function.WebSocketPlugin;
 import org.dromara.soul.web.plugin.ratelimter.RedisRateLimiter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.SearchStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
+import org.springframework.web.reactive.socket.client.WebSocketClient;
+import org.springframework.web.reactive.socket.server.WebSocketService;
+import org.springframework.web.reactive.socket.server.support.HandshakeWebSocketService;
 import org.springframework.web.server.WebFilter;
 
 import java.util.List;
@@ -69,6 +80,7 @@ public class SoulConfiguration {
      * @param zookeeperCacheManager the zookeeper cache manager
      * @param soulEventPublisher    the soul event publisher
      * @param redisRateLimiter      the redis rate limiter
+     * @param upstreamCacheManager  the upstream cache manager
      */
     @Autowired(required = false)
     public SoulConfiguration(final ZookeeperCacheManager zookeeperCacheManager,
@@ -153,6 +165,19 @@ public class SoulConfiguration {
     }
 
     /**
+     * Web socket plugin web socket plugin.
+     *
+     * @param webSocketClient  the web socket client
+     * @param webSocketService the web socket service
+     * @return the web socket plugin
+     */
+    @Bean
+    public WebSocketPlugin webSocketPlugin(final WebSocketClient webSocketClient,
+                                           final WebSocketService webSocketService) {
+        return new WebSocketPlugin(zookeeperCacheManager, upstreamCacheManager, webSocketClient, webSocketService);
+    }
+
+    /**
      * init responsePlugin.
      *
      * @return {@linkplain ResponsePlugin}
@@ -193,6 +218,17 @@ public class SoulConfiguration {
     }
 
     /**
+     * Body web filter web filter.
+     *
+     * @return the web filter
+     */
+    @Bean
+    @Order(-1)
+    public WebFilter bodyWebFilter() {
+        return new BodyWebFilter();
+    }
+
+    /**
      * init param web filter.
      *
      * @return {@linkplain ParamWebFilter}
@@ -214,4 +250,50 @@ public class SoulConfiguration {
     public WebFilter timeWebFilter() {
         return new TimeWebFilter();
     }
+
+
+    /**
+     * Web socket web filter web filter.
+     *
+     * @return the web filter
+     */
+    @Bean
+    @Order(2)
+    public WebFilter webSocketWebFilter() {
+        return new WebSocketWebFilter();
+    }
+
+    /**
+     * Generic param service generic param service.
+     *
+     * @return the generic param service
+     */
+    @Bean
+    @ConditionalOnMissingBean(value = GenericParamService.class, search = SearchStrategy.ALL)
+    public GenericParamService genericParamService() {
+        return new GenericParamServiceImpl();
+    }
+
+
+    /**
+     * Reactor netty web socket client reactor netty web socket client.
+     *
+     * @return the reactor netty web socket client
+     */
+    @Bean
+    public ReactorNettyWebSocketClient reactorNettyWebSocketClient() {
+        return new ReactorNettyWebSocketClient();
+    }
+
+    /**
+     * Web socket service web socket service.
+     *
+     * @return the web socket service
+     */
+    @Bean
+    public WebSocketService webSocketService() {
+        return new HandshakeWebSocketService();
+    }
+
+
 }
